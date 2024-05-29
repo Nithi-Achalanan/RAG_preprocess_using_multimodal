@@ -1,0 +1,6 @@
+functions_framework==3.*
+google_cloud_aiplatform>=1.40
+pdf2image>=1.15.0
+protobuf>=3.19.5,<5.0.0
+vertexai>=1.46.0
+google_cloud>=0.30.0
