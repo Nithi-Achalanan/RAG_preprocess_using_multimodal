@@ -174,9 +174,9 @@ class doc_gen_text:
             "overlap_size" : self.overlap_size,
         }
         
-# page = doc_gen_text(projectID = "rlpd-loxleyorbit", 
-#                     bucket_name = "dev_pun_preprocess",
-#                     blob_path = "upload_test/001_จังหวัดปราจีนบุรี_พร้อมเอกสารแนบ.pdf",
+# page = doc_gen_text(projectID = "" #pun-project, 
+#                     bucket_name = "" #pun_preprocess,
+#                     blob_path = "" #upload_test/text.pdf,
 #                     )
 # page.process_OCR()
 # page.create_params_dict()   
