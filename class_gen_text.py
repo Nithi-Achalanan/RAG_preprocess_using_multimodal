@@ -1,7 +1,9 @@
 from google.cloud import storage
-from pdf2image import convert_from_bytes
+import pymupdf
+from PIL import Image
 import base64
 import io
+from io import BytesIO
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
 import vertexai.preview.generative_models as generative_models
@@ -11,7 +13,7 @@ class doc_gen_text:
     def __init__(self, projectID: str, bucket_name: str, blob_path: str, projectLocate: str = "asia-southeast1", overlap_size: int = 0):
         self.projectID = projectID
         self.bucket_name = bucket_name
-        self.blob_path = blob_path # path exclude bucket but include 
+        self.blob_path = blob_path
         self.projectLocate = projectLocate
         self.overlap_size = overlap_size
         self.OCR_result = None
@@ -26,37 +28,46 @@ class doc_gen_text:
             output : base64_images -> ["","","",""] PNGbase64 of each page in document
         """
         # Initialize a client with the specified project
-        storage_client = storage.Client(project =self.projectID)
-
-        # Specify the bucket name
+        storage_client = storage.Client(project=self.projectID)
 
         # Create a bucket object for our bucket
         bucket = storage_client.get_bucket(self.bucket_name)
+        
         # Create a blob object from the filepath
         blob = bucket.blob(self.blob_path)
 
         # Download the blob's content as a byte stream
         pdf_bytes = blob.download_as_bytes()
 
-        # Convert PDF bytes to images
-        images = convert_from_bytes(pdf_bytes)
+        # Open the PDF from bytes
+        doc = pymupdf.open("pdf", pdf_bytes)
 
         # Initialize a list to store base64 encoded images
         base64_images = []
 
-        # Convert each image to base64 format
-        for i, image in enumerate(images):
-            # Convert PIL image to bytes
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-        
-            # Convert bytes to base64
-            base64_image = base64.b64encode(img_byte_arr).decode('utf-8')
+        # Loop through all pages in the document
+        for page_number in range(len(doc)):
+            # Load the page
+            page = doc.load_page(page_number)
             
-            # Append to the list
-            base64_images.append(base64_image)
+            # Convert the page to a pixmap (image representation)
+            pixmap = page.get_pixmap(dpi=300)
+            
+            # Convert the pixmap to an image using PIL
+            image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+            
+            # Save the image to a bytes buffer
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            
+            # Encode the image in base64
+            img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Append the base64 string to the list
+            base64_images.append(img_base64)
+        #print(" transform to base 64 suscess")
         return base64_images
+
     def generate_parallel(self, prompt):
         """
             this function sent request to LLM in parallel 
@@ -72,6 +83,7 @@ class doc_gen_text:
         # print("list prompt size" ,len(prompt))
         
         # Use a ThreadPoolExecutor for parallel execution
+        #print("before multiple thread")
         with ThreadPoolExecutor(max_workers=len(self.base64_images_dict)) as executor:
             futures = []
             ans = []
@@ -109,6 +121,7 @@ class doc_gen_text:
         responses = model.generate_content(
             [image_description, image,],
             generation_config=generation_config,
+            safety_settings=safety_settings,
             stream=True,
         )
 
@@ -127,16 +140,16 @@ class doc_gen_text:
         for i,item in enumerate(list_intput): #[{}, {}, {},,, ]
             ans_list.append({"image" : item, "no_page" : i})
         return ans_list
-    def overlap_page(self, data_dict):
+    def overlap_page(overlap_size, data_dict):
+        overlap_size = 50
         data_dict_overlap = data_dict.copy()
         for no_page in range(1,len(data_dict)-1):
             no_page_pre = str(no_page-1)
             no_page_post = str(no_page+1)
-            data_dict_overlap[str(no_page)] = data_dict[no_page_pre][-self.overlap_size:]+" "+data_dict[str(no_page)] + data_dict[no_page_post][0:self.overlap_size] 
-        data_dict_overlap["0"] = data_dict["0"] + data_dict["1"][0:self.overlap_size]
-        data_dict_overlap[str(len(data_dict)-1)] = data_dict[str( len(data_dict)-2 )][-self.overlap_size:] + data_dict[str(len(data_dict)-1)]
+            data_dict_overlap[str(no_page)] = data_dict[no_page_pre][-overlap_size:]+" "+data_dict[str(no_page)] + data_dict[no_page_post][0:overlap_size] 
+        data_dict_overlap["0"] = data_dict["0"] + data_dict["1"][0:overlap_size]
+        data_dict_overlap[str(len(data_dict)-1)] = data_dict[str( len(data_dict)-2 )][-overlap_size:] + data_dict[str(len(data_dict)-1)]
         return data_dict_overlap
-    
     def process_OCR(self):
         self.base64_images_input = self.bucket2PNGbase64()
         # prompt = """หน้าที่ของคุณคือแปลงรูปแบบเอกสารที่ได้รับจากรูปที่เป็นเอกสารที่ถูกสแกนเก็บไว้ในรูปแบบของรูปภาพให้เป็นบทความภาษาไทย โดยงานของคุณจะแบ่งออกเป็นสามกรณีดังนี้:
@@ -161,7 +174,7 @@ class doc_gen_text:
         if self.overlap_size == 0 :
             pass
         else :
-            response_ = self.overlap_page(data_dict = response )
+            response_ = self.overlap_page(overlap_size = self.overlap_size , data_dict = response )
             response = response_.copy()
         self.OCR_result = response
     def create_params_dict(self):
@@ -179,5 +192,5 @@ class doc_gen_text:
 #                     blob_path = "" #upload_test/text.pdf,
 #                     )
 # page.process_OCR()
-# page.create_params_dict()   
+# page.create_params_dict() 
         

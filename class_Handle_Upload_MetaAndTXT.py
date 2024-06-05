@@ -23,12 +23,10 @@ class Handle_Upload_MetaAndTXT:
                 else :
                     setattr(self, key, value) 
     def separate_filename_txt(self):
-        path_components = self.blob_txt_path.split("/")
-        self.blob_txt_folder_path = "/".join(path_components[:-1])
-        self.blob_txt_name = path_components[-1]
+        self.blob_txt_name = self.blob_origi_path.split('/')[-1].split(".")[0].replace(" ","_") #extract txt name from original path and replace " " with " "_"
         
     def generate_metadata(self):
-        txt_name = self.blob_txt_name.split(".")[0]
+        txt_name = self.blob_txt_name
         for page in self.OCR_result:
             txt = self.OCR_result[page]
             # self.OCR_result[page]
@@ -43,36 +41,34 @@ class Handle_Upload_MetaAndTXT:
                     },
                     "content": {
                         "mimeType": "text/plain",
-                        "uri": f"gs://{self.bucket_name}/{self.blob_txt_folder_path}/{txt_name}-P{page}.txt"
+                        "uri": f"gs://{self.bucket_name}/{self.blob_txt_path}/{txt_name}-P{page}.txt"
                     # content["url"] คือ .txt สำหรับ datastore
                     }
                 }
+            # datasrore id component
+            page_description["id"] = str(hash(str(page_description))).replace("-", "")
             self.result[f"{page}"] = {"meta":page_description, "txt" : txt}.copy()
     #def upload_meta2bucket(self):
         
     def upload_txt2bucket(self):
         storage_client = storage.Client()
-        bucket = storage_client.bucket(self.bucket_name)
-
-        for page in self.result:
+        for i,page in enumerate(self.result):
             URL = self.result[page]["meta"]["content"]["uri"]
-            txt_name = URL.split("/")[-1].split(".")[0] + ".txt"
+            txt_name = self.blob_txt_name
             storage_client = storage.Client()
-            blob = bucket.blob(f"{self.blob_txt_folder_path}/{txt_name}")
+            bucket = storage_client.bucket(self.bucket_name)
+            blob = bucket.blob(f"{self.blob_txt_path}/{txt_name}-P{i}.txt")
             with blob.open("w") as file:
                 file.write(self.result[page]["txt"])
     
     def upload_meta2bucket(self): # to use self.result and upload it to meta_path
+        txt_name = self.blob_txt_name
         storage_client = storage.Client()
         bucket = storage_client.bucket(self.bucket_name)
-
-        for page in self.result:
-            URL = self.result[page]["meta"]["content"]["uri"]
-            txt_name = URL.split("/")[-1]
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(self.bucket_name)
-            blob = bucket.blob(f"{self.blob_meta_path}/{txt_name}.jsonl")
-            with blob.open("w") as file:
+        blob = bucket.blob(f"{self.blob_meta_path}/{txt_name}.jsonl")
+        with blob.open("w") as file:
+            for page in self.result:
+                URL = self.result[page]["meta"]["content"]["uri"]
                 json_line = json.dumps(self.result[page]["meta"])
                 file.write(json_line + "\n")
                            
@@ -80,9 +76,9 @@ class Handle_Upload_MetaAndTXT:
 # Define the blob (file) path in the bucket.
 # Write each dictionary as a JSON object on a new line in the file.
     
-# A = Handle_Upload_MetaAndTXT(blob_txt_path = "wha_gen_demo/wha_topic3/txt/Thailaw/00016937.pdf",
-#                              blob_origi_path = "wha_gen_demo/wha_topic3/origi/Thailaw/00016937.pdf",
-#                              blob_meta_path = "wha_gen_demo/wha_topic3/metadata/Thailaw/00016937.pdf"
+# A = Handle_Upload_MetaAndTXT(blob_txt_path = "",
+#                              blob_origi_path = "",
+#                              blob_meta_path = ""
 #                              )
 # A.set_params_dict(page.create_params_dict())
 # A.generate_metadata()
