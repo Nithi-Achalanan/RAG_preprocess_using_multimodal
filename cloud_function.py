@@ -3,14 +3,13 @@ from class_gen_text import doc_gen_text
 # Triggered by a change in a storage bucket
 
 # config parameter
-projectID = "rlpd-loxleyorbit"
-target_triger_path ="upload_test/"
-blob_meta_path = "METADATA_preprocessed_file"
-blob_txt_path = "PREPROCESSED_file"
+projectID = "" # pun-project
+target_triger_path ="" # upload_test
+blob_meta_path = "" # METADATA_preprocessed_file
+blob_txt_path = "" # PREPROCESSED_file
 
-# bucket_name = "dev_pun_preprocess"
-# blob_path = "upload_test/001_จังหวัดปราจีนบุรี_พร้อมเอกสารแนบ.pdf"
-
+# bucket_name = "pun_preprocess"
+# blob_path = "upload_test/name.pdf"
 
 def control_event(cloud_event):
     data = cloud_event.data
