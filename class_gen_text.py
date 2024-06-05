@@ -11,7 +11,7 @@ class doc_gen_text:
     def __init__(self, projectID: str, bucket_name: str, blob_path: str, projectLocate: str = "asia-southeast1", overlap_size: int = 0):
         self.projectID = projectID
         self.bucket_name = bucket_name
-        self.blob_path = blob_path
+        self.blob_path = blob_path # path exclude bucket but include 
         self.projectLocate = projectLocate
         self.overlap_size = overlap_size
         self.OCR_result = None
@@ -127,16 +127,16 @@ class doc_gen_text:
         for i,item in enumerate(list_intput): #[{}, {}, {},,, ]
             ans_list.append({"image" : item, "no_page" : i})
         return ans_list
-    def overlap_page(overlap_size, data_dict):
-        overlap_size = 50
+    def overlap_page(self, data_dict):
         data_dict_overlap = data_dict.copy()
         for no_page in range(1,len(data_dict)-1):
             no_page_pre = str(no_page-1)
             no_page_post = str(no_page+1)
-            data_dict_overlap[str(no_page)] = data_dict[no_page_pre][-overlap_size:]+" "+data_dict[str(no_page)] + data_dict[no_page_post][0:overlap_size] 
-        data_dict_overlap["0"] = data_dict["0"] + data_dict["1"][0:overlap_size]
-        data_dict_overlap[str(len(data_dict)-1)] = data_dict[str( len(data_dict)-2 )][-overlap_size:] + data_dict[str(len(data_dict)-1)]
+            data_dict_overlap[str(no_page)] = data_dict[no_page_pre][-self.overlap_size:]+" "+data_dict[str(no_page)] + data_dict[no_page_post][0:self.overlap_size] 
+        data_dict_overlap["0"] = data_dict["0"] + data_dict["1"][0:self.overlap_size]
+        data_dict_overlap[str(len(data_dict)-1)] = data_dict[str( len(data_dict)-2 )][-self.overlap_size:] + data_dict[str(len(data_dict)-1)]
         return data_dict_overlap
+    
     def process_OCR(self):
         self.base64_images_input = self.bucket2PNGbase64()
         # prompt = """หน้าที่ของคุณคือแปลงรูปแบบเอกสารที่ได้รับจากรูปที่เป็นเอกสารที่ถูกสแกนเก็บไว้ในรูปแบบของรูปภาพให้เป็นบทความภาษาไทย โดยงานของคุณจะแบ่งออกเป็นสามกรณีดังนี้:
@@ -161,7 +161,7 @@ class doc_gen_text:
         if self.overlap_size == 0 :
             pass
         else :
-            response_ = self.overlap_page(overlap_size = self.overlap_size , data_dict = response )
+            response_ = self.overlap_page(data_dict = response )
             response = response_.copy()
         self.OCR_result = response
     def create_params_dict(self):
